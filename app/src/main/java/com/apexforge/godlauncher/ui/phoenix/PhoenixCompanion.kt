@@ -29,6 +29,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,8 +40,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.apexforge.godlauncher.R
@@ -48,6 +51,7 @@ import com.apexforge.godlauncher.data.SystemSnapshot
 import com.apexforge.godlauncher.ui.theme.EmberOrange
 import com.apexforge.godlauncher.ui.theme.PhoenixGold
 import kotlin.math.PI
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /**
@@ -70,30 +74,33 @@ fun PhoenixCompanion(
     var bubbleOpen by remember { mutableStateOf(false) }
 
     // Idle life: gentle bob + breathing ember halo.
-    val phase: Float
-    val haloScale: Float
-    val haloAlpha: Float
+    // v7: animation states are read only in the draw/layout phase
+    // (graphicsLayer / offset lambdas) — the companion no longer
+    // recomposes every animation frame.
+    val bobState: State<Float>?
+    val haloScaleState: State<Float>?
+    val haloAlphaState: State<Float>?
     if (animationsEnabled) {
         val t = rememberInfiniteTransition(label = "phoenixIdle")
-        phase = t.animateFloat(
+        bobState = t.animateFloat(
             0f, 2f * PI.toFloat(),
             infiniteRepeatable(tween(3600, easing = LinearEasing), RepeatMode.Restart),
             label = "bob"
-        ).value
-        haloScale = t.animateFloat(
+        )
+        haloScaleState = t.animateFloat(
             1f, 1.22f,
             infiniteRepeatable(tween(2400), RepeatMode.Reverse),
             label = "haloScale"
-        ).value
-        haloAlpha = t.animateFloat(
+        )
+        haloAlphaState = t.animateFloat(
             0.42f, 0.16f,
             infiniteRepeatable(tween(2400), RepeatMode.Reverse),
             label = "haloAlpha"
-        ).value
+        )
     } else {
-        phase = 0f; haloScale = 1.1f; haloAlpha = 0.25f
+        bobState = null; haloScaleState = null; haloAlphaState = null
     }
-    val bobDp = (sin(phase) * 7f).dp
+    val density = LocalDensity.current
 
     val statusLine = remember(snapshot) {
         if (snapshot == null) "Waking up…"
@@ -111,13 +118,22 @@ fun PhoenixCompanion(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer(scaleX = haloScale, scaleY = haloScale)
+                // The animated alpha used to be baked into the brush (which
+                // forced a recomposition every frame); it is now layer alpha
+                // in the draw phase with the brush at its 0.42 peak —
+                // identical output, zero recomposition.
+                .graphicsLayer {
+                    val hs = haloScaleState?.value ?: 1.1f
+                    scaleX = hs
+                    scaleY = hs
+                    alpha = (haloAlphaState?.value ?: 0.25f) / 0.42f
+                }
                 .clip(CircleShape)
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            EmberOrange.copy(alpha = haloAlpha),
-                            PhoenixGold.copy(alpha = haloAlpha * 0.4f),
+                            EmberOrange.copy(alpha = 0.42f),
+                            PhoenixGold.copy(alpha = 0.42f * 0.4f),
                             Color.Transparent
                         )
                     )
@@ -130,7 +146,13 @@ fun PhoenixCompanion(
             contentDescription = "Phoenix companion — tap to chat",
             modifier = Modifier
                 .fillMaxSize(0.92f)
-                .offset(y = bobDp)
+                .offset {
+                    // Draw-phase bob: no recomposition.
+                    val bobPx = with(density) {
+                        (sin(bobState?.value ?: 0f) * 7f).dp.toPx()
+                    }
+                    IntOffset(0, bobPx.roundToInt())
+                }
                 .combinedClickable(
                     interactionSource = interaction,
                     indication = null,

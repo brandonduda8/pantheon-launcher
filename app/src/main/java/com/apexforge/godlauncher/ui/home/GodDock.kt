@@ -106,6 +106,7 @@ fun GodDock(
     onGodClick: (God) -> Unit,
     onGodLongPress: (God) -> Unit,
     animationsEnabled: Boolean = true,
+    started: Boolean = true,
     dockStyle: DockStyle = DockStyle.EMBER_RING,
     iconShape: IconShape = IconShape.CIRCLE,
     iconGlow: Float = 0.5f,
@@ -203,7 +204,10 @@ private fun GodButton(
         label = "godFlare"
     )
 
-    val pulsing = animationsEnabled && dockPulseWave && dockStyle != DockStyle.MINIMAL
+    // v7: halo tickers are not created until the splash dismisses — 16
+    // fewer animation drivers fighting cold start on low-end devices.
+    val pulsing = animationsEnabled && started && dockPulseWave &&
+        dockStyle != DockStyle.MINIMAL
     // v6: halo/tilt phases are read inside graphicsLayer/drawBehind blocks
     // (draw phase) — eight icons no longer recompose every frame.
     val haloScaleState: State<Float>? = if (pulsing) {

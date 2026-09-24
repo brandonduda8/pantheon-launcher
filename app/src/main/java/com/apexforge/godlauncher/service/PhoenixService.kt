@@ -192,7 +192,10 @@ class PhoenixService : Service() {
 
     private fun buildNotification(line: String?): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.phoenix_companion)
+            // v7: small icons must be tiny — the 431KB webp was being
+            // decoded on the main thread inside service onCreate during
+            // the activity's cold-start window.
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle("Phoenix is active")
             .setContentText(
                 (line ?: "Your companion is one tap away") +

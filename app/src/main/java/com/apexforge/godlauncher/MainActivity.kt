@@ -150,10 +150,17 @@ class MainActivity : ComponentActivity() {
         // Always-on Phoenix: if Brandon left "Keep Phoenix alive" on,
         // restart the presence service whenever the launcher opens
         // (Android 12+ forbids starting it silently at boot).
-        if (PhoenixService.keepAliveEnabled(this) && !PhoenixService.running) {
-            try {
-                PhoenixService.start(this)
-            } catch (_: Exception) {
+        // v7: the keep-alive flag is a SharedPreferences disk read — do it
+        // off the main thread so cold start never blocks on storage.
+        lifecycleScope.launch(Dispatchers.IO) {
+            val wantAlive = PhoenixService.keepAliveEnabled(this@MainActivity)
+            if (wantAlive && !PhoenixService.running) {
+                try {
+                    withContext(Dispatchers.Main) {
+                        PhoenixService.start(this@MainActivity)
+                    }
+                } catch (_: Exception) {
+                }
             }
         }
         if (intent?.getBooleanExtra(EXTRA_OPEN_PHOENIX, false) == true) {
@@ -221,11 +228,13 @@ class MainActivity : ComponentActivity() {
                     .collectAsStateWithLifecycle(initialValue = true)
                 // Always-on Phoenix: Brandon's taps. Refreshed whenever
                 // Settings opens (the system can kill the service).
-                var presenceOn by remember {
-                    mutableStateOf(
-                        PhoenixService.keepAliveEnabled(applicationContext) ||
-                            PhoenixService.running
-                    )
+                // v7: keepAliveEnabled() is a SharedPreferences disk read —
+                // seed from the in-memory flag, refresh off the main thread.
+                var presenceOn by remember { mutableStateOf(PhoenixService.running) }
+                LaunchedEffect(Unit) {
+                    presenceOn = withContext(Dispatchers.IO) {
+                        PhoenixService.keepAliveEnabled(applicationContext)
+                    } || PhoenixService.running
                 }
                 // Forge drafts stashed by agents through the Agent Bridge.
                 var forgeDraft by remember { mutableStateOf<AgentBridge.ForgeDraft?>(null) }
@@ -523,9 +532,9 @@ class MainActivity : ComponentActivity() {
                 // can kill the service). Entering Phoenix: fresh tap queue.
                 LaunchedEffect(screen) {
                     if (screen == Screen.Settings) {
-                        presenceOn =
-                            PhoenixService.keepAliveEnabled(applicationContext) ||
-                                PhoenixService.running
+                        presenceOn = withContext(Dispatchers.IO) {
+                            PhoenixService.keepAliveEnabled(applicationContext)
+                        } || PhoenixService.running
                     } else if (screen == Screen.Phoenix) {
                         refreshProposals()
                     }

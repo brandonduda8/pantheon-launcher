@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -106,15 +107,6 @@ fun SplashIgnition(
     }
 
     if (finished) return
-    val p = phase.value
-
-    // Beat envelopes.
-    val ashAlpha = 1f - ss(0.28f, 0.55f, p)
-    val heartAlpha = ss(0.12f, 0.28f, p) * (1f - ss(0.50f, 0.60f, p))
-    val heartPulse = 1f + 0.09f * sin(p * 46f) * heartAlpha
-    val breakFlash = (1f - abs(p - 0.56f) / 0.07f).coerceIn(0f, 1f)
-    val burst = ss(0.54f, 1f, p)
-    val titleAlpha = ss(0.64f, 0.82f, p)
 
     Box(
         modifier = modifier
@@ -122,6 +114,17 @@ fun SplashIgnition(
             .background(Color(0xFF030304))
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
+            // v7: the animation clock is read in the DRAW phase, not
+            // composition — the splash redraws every frame for 2.6s
+            // without recomposing the full-screen tree each frame.
+            val p = phase.value
+            // Beat envelopes.
+            val ashAlpha = 1f - ss(0.28f, 0.55f, p)
+            val heartAlpha = ss(0.12f, 0.28f, p) * (1f - ss(0.50f, 0.60f, p))
+            val heartPulse = 1f + 0.09f * sin(p * 46f) * heartAlpha
+            val breakFlash = (1f - abs(p - 0.56f) / 0.07f).coerceIn(0f, 1f)
+            val burst = ss(0.54f, 1f, p)
+
             val w = size.width
             val h = size.height
             val cx = w / 2f
@@ -257,8 +260,11 @@ fun SplashIgnition(
                 letterSpacing = 10.sp,
                 fontSize = 34.sp
             ),
-            color = Color(0xFFFFD54F).copy(alpha = titleAlpha),
-            modifier = Modifier.align(Alignment.Center)
+            color = Color(0xFFFFD54F),
+            modifier = Modifier
+                .align(Alignment.Center)
+                // v7: title fade in the draw phase — no recomposition.
+                .graphicsLayer { alpha = ss(0.64f, 0.82f, phase.value) }
         )
     }
 }
