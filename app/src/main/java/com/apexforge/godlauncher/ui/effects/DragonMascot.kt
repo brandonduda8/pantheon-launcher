@@ -101,7 +101,15 @@ fun DragonMascot(
     val config = LocalConfiguration.current
     val scope = rememberCoroutineScope()
 
-    var visible by remember { mutableStateOf(true) }
+    // v7: animations stay parked until the activity is actually resumed.
+    // Seeding from the live lifecycle state (not `true`) stops the mascot
+    // from animating through cold start and saturating the main thread.
+    var visible by remember {
+        mutableStateOf(
+            lifecycleOwner.lifecycle.currentState
+                .isAtLeast(Lifecycle.State.RESUMED)
+        )
+    }
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             visible = event.targetState.isAtLeast(Lifecycle.State.RESUMED)

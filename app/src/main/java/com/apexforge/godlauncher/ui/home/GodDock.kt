@@ -32,9 +32,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,10 +52,14 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.apexforge.godlauncher.model.BadgeStyle
 import com.apexforge.godlauncher.model.DockStyle
 import com.apexforge.godlauncher.model.God
@@ -192,6 +199,23 @@ private fun GodButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
+    // v7: tilt stays parked until the activity is actually resumed —
+    // eight infinite transitions must not wake the choreographer
+    // through cold start.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var resumed by remember {
+        mutableStateOf(
+            lifecycleOwner.lifecycle.currentState
+                .isAtLeast(Lifecycle.State.RESUMED)
+        )
+    }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            resumed = event.targetState.isAtLeast(Lifecycle.State.RESUMED)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val pressScale by animateFloatAsState(
         targetValue = if (pressed) 1.08f else 1f,
         animationSpec = spring(
@@ -228,7 +252,7 @@ private fun GodButton(
             label = "haloAlpha"
         )
     } else null
-    val tiltState: State<Float>? = if (tiltEffect && animationsEnabled) {
+    val tiltState: State<Float>? = if (tiltEffect && animationsEnabled && resumed) {
         val tt = rememberInfiniteTransition(label = "godTilt")
         tt.animateFloat(
             0f, 1f,

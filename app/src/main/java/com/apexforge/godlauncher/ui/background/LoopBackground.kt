@@ -89,7 +89,18 @@ fun LoopBackground(
     modifier: Modifier = Modifier
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
-    var visible by remember { mutableStateOf(true) }
+    // v7: animations stay parked until the activity is actually resumed.
+    // Seeding from the live lifecycle state (not `true`) stops every
+    // animated layer from running at full blast through cold start —
+    // on software renderers each animated frame took seconds and
+    // saturated the main thread, starving the resume transaction
+    // (launch timeout, "never resumed" gate failure, v6 phone ANR).
+    var visible by remember {
+        mutableStateOf(
+            lifecycleOwner.lifecycle.currentState
+                .isAtLeast(Lifecycle.State.RESUMED)
+        )
+    }
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             visible = event.targetState.isAtLeast(Lifecycle.State.RESUMED)

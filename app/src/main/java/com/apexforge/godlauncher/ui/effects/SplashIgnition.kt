@@ -40,13 +40,14 @@ private fun ss(e0: Float, e1: Float, x: Float): Float {
 /**
  * Cold-start ignition: RISING FROM ASHES.
  *
- * Beats, driven by a single 0→1 phase over ~2.6s:
- *  1. Near-black with drifting gray ash.
- *  2. A cracked ember heart/core pulses into view — the broken heart,
- *     still burning.
- *  3. The heart breaks open (white-hot flash).
- *  4. The phoenix burst: expanding ember shockwave, rising embers,
- *     "PANTHEON" fading in.
+ * v7: renders as ONE static frame — the phoenix-burst beat (phase 0.8),
+ * drawn once and never invalidated. The animated 2.6s splash read the
+ * animation clock in the draw phase and redrew 116 particles + radial
+ * gradients every frame; on software renderers each frame took seconds,
+ * saturating the main thread through cold start and starving the resume
+ * transaction (launch timeout, "never resumed" gate failure, v6 phone
+ * ANR). The PANTHEON title keeps a cheap fade — only its own layer
+ * invalidates, the Canvas never redraws.
  *
  * Auto-dismisses via [onFinished]. No tap needed.
  */
@@ -56,17 +57,19 @@ fun SplashIgnition(
     modifier: Modifier = Modifier
 ) {
     var finished by remember { mutableStateOf(false) }
-    val phase = remember { Animatable(0f) }
+    // Static ignition beat. Everything below is a pure function of p.
+    val p = 0.8f
+    val titleA = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
-        phase.animateTo(1f, tween(2600, easing = LinearEasing))
+        titleA.animateTo(1f, tween(1200, delayMillis = 300, easing = LinearEasing))
     }
     LaunchedEffect(Unit) {
-        delay(2600)
+        delay(2000)
         finished = true
         onFinished()
     }
 
-    // Pre-allocated fields; everything is a pure function of phase.
+    // Pre-allocated fields; everything is a pure function of the fixed p.
     val ash = remember {
         val rng = Random(77)
         Array(46) {
@@ -114,10 +117,9 @@ fun SplashIgnition(
             .background(Color(0xFF030304))
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            // v7: the animation clock is read in the DRAW phase, not
-            // composition — the splash redraws every frame for 2.6s
-            // without recomposing the full-screen tree each frame.
-            val p = phase.value
+            // v7: static frame — p is a fixed val, so this Canvas draws
+            // exactly once. No per-frame invalidation, no animation clock.
+            // (Beat envelopes below are evaluated at the frozen burst beat.)
             // Beat envelopes.
             val ashAlpha = 1f - ss(0.28f, 0.55f, p)
             val heartAlpha = ss(0.12f, 0.28f, p) * (1f - ss(0.50f, 0.60f, p))
@@ -263,8 +265,10 @@ fun SplashIgnition(
             color = Color(0xFFFFD54F),
             modifier = Modifier
                 .align(Alignment.Center)
-                // v7: title fade in the draw phase — no recomposition.
-                .graphicsLayer { alpha = ss(0.64f, 0.82f, phase.value) }
+                // v7: title fade reads the Animatable in the draw phase —
+                // only this Text's layer invalidates, the Canvas never
+                // redraws.
+                .graphicsLayer { alpha = titleA.value }
         )
     }
 }

@@ -78,7 +78,14 @@ fun QuantumBackground(
     modifier: Modifier = Modifier
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
-    var visible by remember { mutableStateOf(true) }
+    // v7: animations stay parked until the activity is actually resumed
+    // (seeded from the live lifecycle state, not `true`).
+    var visible by remember {
+        mutableStateOf(
+            lifecycleOwner.lifecycle.currentState
+                .isAtLeast(Lifecycle.State.RESUMED)
+        )
+    }
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             visible = event.targetState.isAtLeast(Lifecycle.State.RESUMED)

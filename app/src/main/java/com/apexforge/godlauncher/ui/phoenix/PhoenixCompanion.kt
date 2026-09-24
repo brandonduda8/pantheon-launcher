@@ -29,6 +29,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,11 +42,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.apexforge.godlauncher.R
 import com.apexforge.godlauncher.data.SystemSnapshot
 import com.apexforge.godlauncher.ui.theme.EmberOrange
@@ -73,6 +77,24 @@ fun PhoenixCompanion(
 ) {
     var bubbleOpen by remember { mutableStateOf(false) }
 
+    // v7: idle life stays parked until the activity is actually resumed —
+    // the infinite transition otherwise runs through cold start and
+    // saturates the main thread on software renderers.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var resumed by remember {
+        mutableStateOf(
+            lifecycleOwner.lifecycle.currentState
+                .isAtLeast(Lifecycle.State.RESUMED)
+        )
+    }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            resumed = event.targetState.isAtLeast(Lifecycle.State.RESUMED)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     // Idle life: gentle bob + breathing ember halo.
     // v7: animation states are read only in the draw/layout phase
     // (graphicsLayer / offset lambdas) — the companion no longer
@@ -80,7 +102,7 @@ fun PhoenixCompanion(
     val bobState: State<Float>?
     val haloScaleState: State<Float>?
     val haloAlphaState: State<Float>?
-    if (animationsEnabled) {
+    if (animationsEnabled && resumed) {
         val t = rememberInfiniteTransition(label = "phoenixIdle")
         bobState = t.animateFloat(
             0f, 2f * PI.toFloat(),
