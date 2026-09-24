@@ -34,6 +34,17 @@ fi
 echo "== launched, waiting 45s for splash + home to settle..."
 sleep 45
 
+# DIAGNOSTIC (v7): capture main-thread stack during the settle window.
+# If the emulator's software renderer is overwhelming the app, SIGQUIT
+# dumps every thread's stack to logcat — definitive proof of where the
+# main thread is stuck (vs guessing from frame stats).
+APP_PID="$(adb shell pidof "$PKG" 2>/dev/null | tr -d '\r' || true)"
+if [ -n "$APP_PID" ]; then
+    echo "== diagnostic: SIGQUIT to $PKG (pid $APP_PID) for thread dump"
+    adb shell "kill -3 $APP_PID" 2>/dev/null || true
+    sleep 3
+fi
+
 adb logcat -d > logcat.txt || true
 adb shell screencap -p /sdcard/smoke.png >/dev/null 2>&1 || true
 adb pull /sdcard/smoke.png smoke.png >/dev/null 2>&1 || echo "no screenshot" > smoke.png.txt
@@ -75,10 +86,23 @@ else
     echo "SMOKE_FAIL: MainActivity never reached resumed state"
     adb shell dumpsys activity activities 2>/dev/null | tr -d '\r' | grep -E "mResumedActivity|mFocusedApp" | head -5 || true
     FAIL=1
+    # DIAGNOSTIC (v7): extended resume polling — does it EVER resume?
+    # If the emulator is just slow to warm up (SwiftShader), the activity
+    # may resume at +90s. This distinguishes "slow warmup" from "stuck".
+    echo "== diagnostic: polling for resumed state (up to +120s)..."
+    for i in 1 2 3 4 5; do
+        sleep 15
+        if adb shell dumpsys activity activities 2>/dev/null | tr -d '\r' | grep -q "mResumedActivity.*$PKG"; then
+            echo "DIAGNOSTIC: MainActivity resumed at +$((45 + i * 15))s (slow warmup, not stuck)"
+            break
+        fi
+        echo "DIAGNOSTIC: still not resumed at +$((45 + i * 15))s"
+    done
 fi
 
 if [ "$FAIL" -ne 0 ]; then
     echo "== SMOKE RESULT: FAIL"
     exit 1
 fi
+echo "SMOKE_PASS"
 echo "== SMOKE RESULT: PASS — no ANR, no crash, MainActivity resumed"
