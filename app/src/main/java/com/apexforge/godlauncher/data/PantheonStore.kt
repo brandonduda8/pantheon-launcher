@@ -10,7 +10,15 @@ import com.apexforge.godlauncher.model.PANTHEON
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-private val Context.pantheonDataStore by preferencesDataStore(name = "pantheon_prefs")
+/**
+ * The ONE DataStore delegate for the pantheon_prefs file. Every store class
+ * in this package must use this exact delegate — a second
+ * `preferencesDataStore("pantheon_prefs")` delegate creates a second active
+ * DataStore on the same file and DataStore throws IllegalStateException
+ * ("multiple DataStores active for the same file"). That was the v6 launch
+ * crash (and the ANR on Brandon's phone): ModStore had its own delegate.
+ */
+internal val Context.pantheonDataStore by preferencesDataStore(name = "pantheon_prefs")
 
 /**
  * All persisted launcher state: god-dock app assignments and the

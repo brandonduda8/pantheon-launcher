@@ -6,12 +6,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 private val PantheonColorScheme = darkColorScheme(
-    primary = NebulaViolet,
-    onPrimary = Color.White,
-    secondary = NebulaTeal,
+    // Brand soul: charcoal ashes into ember orange and phoenix gold.
+    primary = EmberOrange,
+    onPrimary = Color.Black,
+    secondary = PhoenixGold,
     onSecondary = Color.Black,
-    tertiary = NebulaMagenta,
-    onTertiary = Color.Black,
+    tertiary = Color(0xFFE25822),
+    onTertiary = Color.White,
     background = VoidBlack,
     onBackground = StarWhite,
     surface = Color(0xFF0D1020),

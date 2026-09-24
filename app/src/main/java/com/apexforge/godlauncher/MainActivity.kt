@@ -62,6 +62,8 @@ import com.apexforge.godlauncher.data.AgentBridge
 import com.apexforge.godlauncher.data.AppRepository
 import com.apexforge.godlauncher.data.LaunchHistory
 import com.apexforge.godlauncher.data.ModStore
+import com.apexforge.godlauncher.data.NodeProbe
+import com.apexforge.godlauncher.data.NodeReach
 import com.apexforge.godlauncher.data.PantheonStore
 import com.apexforge.godlauncher.data.PhoenixAction
 import com.apexforge.godlauncher.data.PhoenixBrain
@@ -86,6 +88,7 @@ import com.apexforge.godlauncher.ui.effects.DragonMascot
 import com.apexforge.godlauncher.ui.effects.PhoenixFX
 import com.apexforge.godlauncher.ui.effects.SplashIgnition
 import com.apexforge.godlauncher.ui.home.HomeScreen
+import com.apexforge.godlauncher.ui.nodes.GenesisScreen
 import com.apexforge.godlauncher.ui.phoenix.ChatMessage
 import com.apexforge.godlauncher.ui.phoenix.PhoenixCompanion
 import com.apexforge.godlauncher.ui.phoenix.PhoenixScreen
@@ -93,7 +96,6 @@ import com.apexforge.godlauncher.ui.quantum.GodQuickSheet
 import com.apexforge.godlauncher.ui.settings.SettingsScreen
 import com.apexforge.godlauncher.ui.forge.ForgeScreen
 import com.apexforge.godlauncher.ui.settings.ThemeEngineScreen
-import com.apexforge.godlauncher.ui.system.SystemScreen
 import com.apexforge.godlauncher.ui.theme.PantheonTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -267,6 +269,50 @@ class MainActivity : ComponentActivity() {
                     else badgesPrimed = true
                 }
 
+                // Genesis mesh probes: tailnet reachability for zane-box and
+                // penguin. Probed on demand (never faked, never cached as live).
+                var nodeReach by remember { mutableStateOf<Map<String, NodeReach>>(emptyMap()) }
+                var probingNodes by remember { mutableStateOf(false) }
+                fun probeNodes() {
+                    if (probingNodes) return
+                    probingNodes = true
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        val results = mutableMapOf<String, NodeReach>()
+                        for (node in com.apexforge.godlauncher.data.GENESIS_NODES) {
+                            val host = node.host ?: continue
+                            results[node.id] = NodeProbe.probe(host, node.port)
+                        }
+                        withContext(Dispatchers.Main) {
+                            nodeReach = results
+                            probingNodes = false
+                        }
+                    }
+                }
+
+                /** Genesis Powers: every row fires something real. */
+                fun firePower(id: String) {
+                    when (id) {
+                        "phoenix-ask", "phoenix-queue" -> screen = Screen.Phoenix
+                        "nodes", "system", "powers" -> {
+                            screen = Screen.System
+                            probeNodes()
+                        }
+                        "forge" -> screen = Screen.Forge
+                        "gods", "drawer" -> screen =
+                            if (id == "drawer") Screen.Drawer else Screen.Home
+                        "wallpaper" -> applyQuantumWallpaper()
+                        "theme", "gestures" -> screen = Screen.ThemeEngine
+                        "companion" -> screen = Screen.Settings
+                        "bridge" -> Toast.makeText(
+                            this@MainActivity,
+                            "Agent Bridge listens for " +
+                                "com.apexforge.godlauncher.agent.COMMAND broadcasts " +
+                                "(see AGENT_BRIDGE.md)",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+
                 var screen by remember { mutableStateOf<Screen>(Screen.Home) }
                 var pickingFor by remember { mutableStateOf<God?>(null) }
                 var sheetGod by remember { mutableStateOf<God?>(null) }
@@ -319,6 +365,15 @@ class MainActivity : ComponentActivity() {
                             is PhoenixAction.LaunchApp -> launchApp(action.packageName)
                             PhoenixAction.SetQuantumWallpaper -> applyQuantumWallpaper()
                             PhoenixAction.OpenDrawer -> screen = Screen.Drawer
+                            is PhoenixAction.Navigate -> screen = when (action.route) {
+                                "theme" -> Screen.ThemeEngine
+                                "forge" -> Screen.Forge
+                                "settings" -> Screen.Settings
+                                "phoenix" -> Screen.Phoenix
+                                "drawer" -> Screen.Drawer
+                                // genesis, nodes, powers, system all live in the hub
+                                else -> Screen.System
+                            }
                             null -> { /* pure reply, no device action */ }
                         }
                         phoenixMessages.add(ChatMessage(reply, fromPhoenix = true))
@@ -811,14 +866,19 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        // Pantheon System screen: stored snapshot dashboard.
+                        // GENESIS hub: nodes (live probes) + powers (everything it
+                        // can do / change) + system (stored snapshot, labeled).
                         AnimatedVisibility(
                             visible = screen == Screen.System,
                             enter = appEnter(),
                             exit = appExit()
                         ) {
-                            SystemScreen(
+                            GenesisScreen(
                                 snapshot = systemSnapshot,
+                                reach = nodeReach,
+                                probing = probingNodes,
+                                onProbeNodes = { probeNodes() },
+                                onPower = ::firePower,
                                 onBack = { screen = Screen.Home },
                                 modifier = Modifier.fillMaxSize()
                             )
