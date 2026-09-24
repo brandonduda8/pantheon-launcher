@@ -70,6 +70,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Check out (smoke test script)
+        uses: actions/checkout@v4
+
       - name: Download APK artifact
         uses: actions/download-artifact@v4
         with:
@@ -83,41 +86,9 @@ jobs:
           target: default
           arch: x86_64
           profile: pixel_6
-          script: |
-            set -u
-            PKG=com.apexforge.godlauncher
-            ls -la apk/
-            adb install -r apk/app-release.apk
-            adb logcat -c
-            adb shell am start -n $PKG/.MainActivity
-            echo "launched, waiting 45s for splash + home to settle..."
-            sleep 45
-            adb logcat -d > logcat.txt
-            adb shell cat /data/anr/traces.txt > anr-traces.txt 2>/dev/null \
-              || echo "no /data/anr/traces.txt" > anr-traces.txt
-            echo "=== ANR / crash check ==="
-            FAIL=0
-            if grep -q "ANR in $PKG" logcat.txt; then
-              echo "SMOKE_FAIL: ANR detected for $PKG"
-              grep -B2 -A60 "ANR in $PKG" logcat.txt | head -120
-              FAIL=1
-            fi
-            if grep -q "FATAL EXCEPTION" logcat.txt; then
-              echo "SMOKE_FAIL: FATAL EXCEPTION in logcat"
-              grep -B8 -A25 "FATAL EXCEPTION" logcat.txt | head -80
-              FAIL=1
-            fi
-            if ! adb shell pidof $PKG > /dev/null 2>&1; then
-              echo "SMOKE_FAIL: process $PKG not running after 45s"
-              FAIL=1
-            fi
-            if [ "$FAIL" -ne 0 ]; then
-              echo "=== ActivityManager / runtime lines ==="
-              grep -E "ActivityManager|AndroidRuntime" logcat.txt | tail -40
-            else
-              echo "SMOKE_PASS: no ANR, no crash, process alive"
-            fi
-            exit $FAIL
+          # ONE line: the runner executes each `script:` line in a fresh
+          # shell, so the test itself must be a file (see smoke-test.sh).
+          script: bash .github/workflows/smoke-test.sh apk/app-release.apk
 
       - name: Upload smoke test logs
         if: always()
@@ -127,3 +98,4 @@ jobs:
           path: |
             logcat.txt
             anr-traces.txt
+            smoke.png
