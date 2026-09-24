@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fullscreen, no action bar; status/nav bars go translucent so the
+         quantum canvas bleeds edge to edge. -->
+    <style name="Theme.PantheonLauncher" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:windowTranslucentNavigation">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowBackground">@color/void_black</item>
+    </style>
+</resources>

@@ -1,0 +1,8 @@
+// Top-level build file for Pantheon Launcher.
+// Versions are declared here so the GitHub Actions build and any local
+// Android Studio build resolve the exact same toolchain.
+plugins {
+    id("com.android.application") version "8.5.2" apply false
+    id("org.jetbrains.kotlin.android") version "2.0.20" apply false
+    id("org.jetbrains.kotlin.plugin.compose") version "2.0.20" apply false
+}

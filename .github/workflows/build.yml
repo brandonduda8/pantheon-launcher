@@ -1,0 +1,61 @@
+# Build Pantheon Launcher — signed, shrunk release APK (v6+)
+#
+# No Gradle wrapper is checked in on purpose: the workflow installs a pinned
+# Gradle (8.7) via gradle/actions/setup-gradle, so the build is reproducible
+# without committing a wrapper jar.
+#
+# Persistent CI signing: the keystore is stored as base64 in the
+# PANTHEON_KEYSTORE_B64 secret along with PANTHEON_KEYSTORE_PASSWORD,
+# PANTHEON_KEY_ALIAS, and PANTHEON_KEY_PASSWORD. The first secret upload
+# created the key that V6+ all share, so future builds update in place.
+# (V5 used GitHub's ephemeral debug key and cannot be updated — V5 must be
+# uninstalled before installing V6 once.)
+
+name: Build release APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+
+      - name: Accept Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - name: Restore signing keystore
+        run: |
+          echo "$PANTHEON_KEYSTORE_B64" | base64 -d > /tmp/pantheon-release.p12
+          echo "PANTHEON_KEYSTORE_PATH=/tmp/pantheon-release.p12" >> "$GITHUB_ENV"
+        env:
+          PANTHEON_KEYSTORE_B64: ${{ secrets.PANTHEON_KEYSTORE_B64 }}
+
+      - name: Build signed release APK
+        run: gradle :app:assembleRelease --no-daemon --stacktrace
+        env:
+          PANTHEON_KEYSTORE_PASSWORD: ${{ secrets.PANTHEON_KEYSTORE_PASSWORD }}
+          PANTHEON_KEY_ALIAS: ${{ secrets.PANTHEON_KEY_ALIAS }}
+          PANTHEON_KEY_PASSWORD: ${{ secrets.PANTHEON_KEY_PASSWORD }}
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: pantheon-launcher-release
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error

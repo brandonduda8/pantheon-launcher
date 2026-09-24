@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pantheon Launcher</string>
+    <string name="about_text">Pantheon Launcher v1.0.0 — a hand-built home screen for Brandon\'s creation station. Quantum-astrology canvas, god-tier quick actions, zero bloat. Crafted with Jetpack Compose.</string>
+</resources>

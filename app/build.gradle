@@ -1,0 +1,98 @@
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
+}
+
+android {
+    namespace = "com.apexforge.godlauncher"
+    compileSdk = 34
+
+    defaultConfig {
+        applicationId = "com.apexforge.godlauncher"
+        minSdk = 29
+        targetSdk = 34
+        versionCode = 6
+        versionName = "6.0.0"
+
+        vectorDrawables {
+            useSupportLibrary = true
+        }
+    }
+
+    signingConfigs {
+        release {
+            // v6: persistent CI signing — keystore/passwords come from
+            // GitHub Actions secrets (see .github/workflows/build.yml).
+            // V6+ builds share one key and update in place. Absent
+            // locally -> unsigned release build.
+            def ksPath = System.getenv("PANTHEON_KEYSTORE_PATH")
+            if (ksPath != null && !ksPath.isEmpty()) {
+                storeFile = file(ksPath)
+                storePassword = System.getenv("PANTHEON_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("PANTHEON_KEY_ALIAS")
+                keyPassword = System.getenv("PANTHEON_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            // v6: full R8 shrink + resource shrink — the old 58MB debug APK
+            // was the biggest reason the launcher felt broken on install.
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            signingConfig = signingConfigs.getByName("release")
+        }
+        debug {
+            // Debug APK is what GitHub Actions uploads as the installable artifact.
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+}
+
+dependencies {
+    def composeBom = platform("androidx.compose:compose-bom:2024.06.00")
+    implementation composeBom
+    androidTestImplementation composeBom
+
+    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.activity:activity-compose:1.9.2")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.5")
+
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
+
+    // Persistent storage for god-dock assignments + settings (no extra DB needed).
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    debugImplementation("androidx.compose.ui:ui-tooling")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+}

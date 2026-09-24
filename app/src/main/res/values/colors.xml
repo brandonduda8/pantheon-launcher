@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Deep-space base for the system chrome behind the Compose canvas. -->
+    <color name="void_black">#FF060814</color>
+    <color name="nebula_violet">#FF8B5CF6</color>
+    <color name="nebula_teal">#FF2DD4BF</color>
+    <color name="nebula_magenta">#FFE879F9</color>
+</resources>

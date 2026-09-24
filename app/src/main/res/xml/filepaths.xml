@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FileProvider paths for theme export sharing (Theme Engine). -->
+<paths>
+    <cache-path name="themes" path="themes/" />
+    <!-- Forge: crew-built APKs downloaded to app cache for install. -->
+    <cache-path name="forge" path="forge/" />
+</paths>

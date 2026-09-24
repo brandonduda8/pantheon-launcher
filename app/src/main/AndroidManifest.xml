@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- A launcher must see every installed app on Android 11+ (API 30+). -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <!-- Lets the long-press gesture apply the bundled quantum wallpaper. -->
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
+    <!-- Lets Phoenix think with Brandon's own Gemini API key. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Always-on Phoenix: keep the companion alive with a persistent
+         notification (Brandon's tap in Settings). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- Optional floating Phoenix over other apps (Brandon's tap in
+         Settings; granted in the system overlay-permission screen). -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- Universal search: contacts are searched only with this in-context,
+         optional grant — apps-only search works without it. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.PantheonLauncher">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:stateNotNeeded="true"
+            android:theme="@style/Theme.PantheonLauncher"
+            android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <!-- Makes Android offer Pantheon as a home-screen replacement. -->
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <!-- Also lists it among normal apps. -->
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Unread-count badges on the god dock and drawer rows. Strictly
+             opt-in: Brandon enables it from Settings, which opens the
+             system notification-access screen. -->
+        <service
+            android:name=".data.PhoenixNotificationService"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- Theme export sharing (Theme Engine -> Export theme). Serves
+             files from the app cache dir only; no new permission needed. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/filepaths" />
+        </provider>
+
+        <!-- Agent Bridge: on-device broadcast protocol for agent frameworks
+             (OpenHands / OpenManus / OpenClaw / ZeroClaw) and on-device
+             automation (Tasker/Automate). Exported so agents can reach it;
+             intents are explicit to this package. See AGENT_BRIDGE.md. -->
+        <receiver
+            android:name=".data.AgentBridgeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.apexforge.godlauncher.agent.COMMAND" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Always-on Phoenix: foreground service for the persistent
+             companion (notification + optional overlay). specialUse is the
+             honest type: an always-available AI companion is the whole
+             feature, started only by Brandon's tap in Settings. -->
+        <service
+            android:name=".service.PhoenixService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Always-on AI companion: keeps Phoenix, the user's personal assistant, reachable from anywhere on the phone via a persistent notification and an optional floating companion. Starts only from the user's explicit toggle in launcher Settings; stops from the same toggle." />
+        </service>
+    </application>
+</manifest>
