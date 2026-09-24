@@ -193,7 +193,21 @@ class MainActivity : ComponentActivity() {
                     lifecycleOwner.lifecycle.addObserver(observer)
                     onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
                 }
-                LaunchedEffect(reloadTick) {
+                // v2 ignition: splash shows once per process start (survives
+                // rotation via rememberSaveable), phoenix ignites once.
+                // Declared up here (before first use) so the cold-start
+                // effects below can gate on it.
+                var splashDone by rememberSaveable { mutableStateOf(false) }
+                var ignitePhoenix by remember { mutableStateOf(true) }
+                LaunchedEffect(Unit) {
+                    delay(2000)
+                    ignitePhoenix = false
+                }
+                // v7 cold-start: the app list query (PackageManager IPC +
+                // label sort) runs after the splash dismisses so it never
+                // contends with the first frame. The splash is opaque anyway.
+                LaunchedEffect(reloadTick, splashDone) {
+                    if (!splashDone) return@LaunchedEffect
                     apps = repo.loadApps()
                     // Refresh the contacts permission grant (e.g. after the
                     // user changes it in system settings).
@@ -329,14 +343,7 @@ class MainActivity : ComponentActivity() {
                 var focusSearchTick by remember { mutableIntStateOf(0) }
                 var suggestionPulseIdx by remember { mutableIntStateOf(0) }
 
-                // v2 ignition: splash shows once per process start (survives
-                // rotation via rememberSaveable), phoenix ignites once.
-                var splashDone by rememberSaveable { mutableStateOf(false) }
-                var ignitePhoenix by remember { mutableStateOf(true) }
-                LaunchedEffect(Unit) {
-                    delay(2000)
-                    ignitePhoenix = false
-                }
+                // (splash state moved above, before first use)
 
                 // Phoenix chat state (lives as long as the activity does).
                 val phoenixMessages = remember {
@@ -629,342 +636,352 @@ class MainActivity : ComponentActivity() {
                     )
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
-                        LoopBackground(
-                            config = config,
-                            animationsEnabled = animationsEnabled,
-                            started = splashDone
-                        )
-
-                        // Living layer, home screen only. The phoenix burns
-                        // behind the home UI (clock stays readable) at the
-                        // clock area; the dragon overlays per its configured
-                        // corner.
-                        if (screen == Screen.Home) {
-                            PhoenixFX(
-                                animationsEnabled = animationsEnabled,
-                                ignite = ignitePhoenix,
-                                started = splashDone,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-
-                        HomeScreen(
-                            apps = apps,
-                            godLabels = godLabels,
-                            godPackages = godPackages,
-                            badgeCounts = badgeCounts,
-                            suggestions = suggestions,
-                            contactsGranted = contactsGranted,
-                            onRequestContactsPermission = {
-                                requestContactsPermission.launch(
-                                    Manifest.permission.READ_CONTACTS
-                                )
-                            },
-                            onLaunchApp = ::launchApp,
-                            onSuggestionLaunch = { pkg ->
-                                // Rotating god pulse: suggestions keep the
-                                // constellation breathing.
-                                ActivityBus.pulse(
-                                    PANTHEON[suggestionPulseIdx % PANTHEON.size].id
-                                )
-                                suggestionPulseIdx++
-                                launchApp(pkg)
-                            },
-                            onGodClick = { god ->
-                                ActivityBus.pulse(god.id)
-                                val pkg = godPackages[god.id]
-                                if (pkg != null) launchApp(pkg) else pickingFor = god
-                            },
-                            onGodLongPress = { god -> pickingFor = god },
-                            onOrbLongPress = { god -> sheetGod = god },
-                            onOpenDrawer = { screen = Screen.Drawer },
-                            onOpenSettings = { screen = Screen.Settings },
-                            onOpenPhoenix = { screen = Screen.Phoenix },
-                            onOpenSystem = { screen = Screen.System },
-                            onPhoenixPrompt = { text ->
-                                ActivityBus.pulse("phoenix")
-                                pendingPhoenixPrompt = text
-                                screen = Screen.Phoenix
-                            },
-                            onSetWallpaper = { applyQuantumWallpaper() },
-                            animationsEnabled = animationsEnabled,
-                            splashDone = splashDone,
-                            config = config,
-                            focusSearchSignal = focusSearchTick,
-                            onSwipeUp = { performGesture(config.gestureSwipeUp) },
-                            onSwipeDown = { performGesture(config.gestureSwipeDown) },
-                            onDoubleTap = { performGesture(config.gestureDoubleTap) },
-                            onPinch = { performGesture(config.gesturePinch) },
-                            onTwoFingerTap = { performGesture(config.gestureTwoFingerTap) }
-                        )
-
-                        if (screen == Screen.Home &&
-                            config.dragonPosition != DragonPosition.HIDDEN
-                        ) {
-                            val dragonAlign = when (config.dragonPosition) {
-                                DragonPosition.BOTTOM_RIGHT -> Alignment.BottomEnd
-                                DragonPosition.BOTTOM_LEFT -> Alignment.BottomStart
-                                DragonPosition.TOP_RIGHT -> Alignment.TopEnd
-                                DragonPosition.TOP_LEFT -> Alignment.TopStart
-                                DragonPosition.HIDDEN -> Alignment.BottomEnd
-                            }
-                            DragonMascot(
-                                animationsEnabled = animationsEnabled,
-                                skin = config.dragonSkin,
-                                behavior = config.dragonBehavior,
-                                started = splashDone,
-                                modifier = Modifier
-                                    .align(dragonAlign)
-                                    .padding(12.dp)
-                                    .size((104f * config.dragonSize).dp)
-                            )
-                        }
-
-                        // Phoenix — Brandon's on-screen companion. Tap to chat,
-                        // long-press for a stored-snapshot status bubble.
-                        // Swappable art: res/drawable/phoenix_companion.webp.
-                        if (screen == Screen.Home && companionVisible) {
-                            PhoenixCompanion(
-                                snapshot = systemSnapshot,
-                                animationsEnabled = animationsEnabled,
-                                onOpenChat = { screen = Screen.Phoenix },
-                                modifier = Modifier
-                                    .align(Alignment.CenterEnd)
-                                    .padding(end = 10.dp)
-                                    .size(112.dp)
-                            )
-                        }
-
-                        AnimatedVisibility(
-                            visible = screen == Screen.Drawer,
-                            enter = appEnter(),
-                            exit = appExit()
-                        ) {
-                            AppDrawer(
-                                apps = apps,
-                                onLaunch = ::launchApp,
-                                onClose = { screen = Screen.Home },
-                                badgeCounts = badgeCounts,
-                                gridCols = config.gridCols,
-                                iconSize = config.iconSize,
-                                labelsVisible = config.labelsVisible,
-                                labelSize = config.labelSize,
-                                onSearch = { ActivityBus.pulse("odysseus") },
-                                animationsEnabled = animationsEnabled
-                            )
-                        }
-
-                        AnimatedVisibility(
-                            visible = screen == Screen.Settings,
-                            enter = appEnter(),
-                            exit = appExit()
-                        ) {
-                            SettingsScreen(
-                                animationsEnabled = animationsEnabled,
-                                onToggleAnimations = { enabled ->
-                                    lifecycleScope.launch { store.setAnimationsEnabled(enabled) }
-                                },
-                companionVisible = companionVisible,
-                                onToggleCompanion = { visible ->
-                                    lifecycleScope.launch { store.setCompanionVisible(visible) }
-                                },
-                                presenceOn = presenceOn,
-                                onTogglePresence = { on ->
-                                    if (on) {
-                                        try {
-                                            PhoenixService.start(this@MainActivity)
-                                            presenceOn = true
-                                        } catch (e: Exception) {
-                                            Toast.makeText(
-                                                this@MainActivity,
-                                                "Couldn't start Phoenix: ${e.message}",
-                                                Toast.LENGTH_LONG
-                                            ).show()
-                                        }
-                                    } else {
-                                        PhoenixService.stop(this@MainActivity)
-                                        presenceOn = false
-                                    }
-                                },
-                                godLabels = godLabels,
-                                onPickGodApp = { god -> pickingFor = god },
-                                onClearGodApp = { god ->
-                                    lifecycleScope.launch { store.clearGodApp(god) }
-                                },
-                                onOpenThemeEngine = { screen = Screen.ThemeEngine },
-                                onOpenForge = { screen = Screen.Forge },
-                                forgeGatewayUrl = forgeGatewayUrl,
-                                forgeApiKey = forgeApiKey,
-                                onSaveGateway = { url, key ->
-                                    lifecycleScope.launch {
-                                        store.setForgeGatewayUrl(url)
-                                        store.setForgeApiKey(key)
-                                    }
-                                },
-                                onBack = { screen = Screen.Home }
-                            )
-                        }
-
-                        AnimatedVisibility(
-                            visible = screen == Screen.ThemeEngine,
-                            enter = appEnter(),
-                            exit = appExit()
-                        ) {
-                            ThemeEngineScreen(
+                        // v7 cold-start fast path: the ignition splash is fully
+                        // opaque for its 2.6s life, so the entire home tree
+                        // (LoopBackground, PhoenixFX, HomeScreen, dragon,
+                        // companion, drawers and sheets) composes only AFTER
+                        // it dismisses. First frame = splash only -> Displayed
+                        // ASAP; the heavy composition lands on a warm system.
+                        // Zero visual change: nothing behind the splash is
+                        // ever visible while it is up.
+                        if (splashDone) {
+                            LoopBackground(
                                 config = config,
-                                onConfigChange = { new ->
-                                    lifecycleScope.launch { modStore.update { _ -> new } }
-                                },
-                                onProfileSelect = { profile ->
-                                    lifecycleScope.launch { modStore.setActiveProfile(profile) }
-                                },
-                                onPresetApply = { preset ->
-                                    lifecycleScope.launch { modStore.applyPreset(preset) }
-                                },
-                                onExport = { exportTheme(config) },
-                                onImport = { importLauncher.launch("application/json") },
-                                onBack = { screen = Screen.Home }
-                            )
-                        }
-
-                        AnimatedVisibility(
-                            visible = screen == Screen.Phoenix,
-                            enter = appEnter(),
-                            exit = appExit()
-                        ) {
-                            PhoenixScreen(
-                                apiKey = phoenixApiKey,
-                                messages = phoenixMessages,
-                                busy = phoenixBusy,
-                                onSaveApiKey = { key ->
-                                    lifecycleScope.launch { store.setPhoenixApiKey(key) }
-                                },
-                                onSend = ::sendToPhoenix,
-                                onBack = { screen = Screen.Home },
-                                proposals = proposals,
-                                onProposalPrimary = { proposal ->
-                                    // "tap" and "genesis" kinds need the machine:
-                                    // copy for Zane. Everything else: mark done.
-                                    if (proposal.kind == "tap" || proposal.kind == "genesis") {
-                                        copyProposalForZane(proposal)
-                                    } else {
-                                        resolveProposal(proposal)
-                                    }
-                                },
-                                onProposalDismiss = ::dismissProposal
-                            )
-                        }
-
-                        AnimatedVisibility(
-                            visible = screen == Screen.Forge,
-                            enter = appEnter(),
-                            exit = appExit()
-                        ) {
-                            ForgeScreen(
-                                gatewayUrl = forgeGatewayUrl,
-                                apiKey = forgeApiKey,
                                 animationsEnabled = animationsEnabled,
-                                onSaveGateway = { url, key ->
-                                    lifecycleScope.launch {
-                                        store.setForgeGatewayUrl(url)
-                                        store.setForgeApiKey(key)
-                                    }
-                                },
-                                onBack = { screen = Screen.Home },
-                                prefill = forgeDraft,
-                                prefillTick = forgeDraftTick
+                                started = splashDone
                             )
-                        }
 
-                        // GENESIS hub: nodes (live probes) + powers (everything it
-                        // can do / change) + system (stored snapshot, labeled).
-                        AnimatedVisibility(
-                            visible = screen == Screen.System,
-                            enter = appEnter(),
-                            exit = appExit()
-                        ) {
-                            GenesisScreen(
-                                snapshot = systemSnapshot,
-                                reach = nodeReach,
-                                probing = probingNodes,
-                                onProbeNodes = { probeNodes() },
-                                onPower = ::firePower,
-                                onBack = { screen = Screen.Home },
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
+                            // Living layer, home screen only. The phoenix burns
+                            // behind the home UI (clock stays readable) at the
+                            // clock area; the dragon overlays per its configured
+                            // corner.
+                            if (screen == Screen.Home) {
+                                PhoenixFX(
+                                    animationsEnabled = animationsEnabled,
+                                    ignite = ignitePhoenix,
+                                    started = splashDone,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
 
-                        pickingFor?.let { god ->
-                            AppPickerDialog(
-                                title = "Assign app to ${god.name}",
+                            HomeScreen(
                                 apps = apps,
-                                onPick = { app ->
-                                    lifecycleScope.launch {
-                                        store.setGodApp(god, app.packageName, app.label)
-                                    }
-                                    pickingFor = null
-                                    Toast.makeText(
-                                        this@MainActivity,
-                                        "${god.name} → ${app.label}",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
+                                godLabels = godLabels,
+                                godPackages = godPackages,
+                                badgeCounts = badgeCounts,
+                                suggestions = suggestions,
+                                contactsGranted = contactsGranted,
+                                onRequestContactsPermission = {
+                                    requestContactsPermission.launch(
+                                        Manifest.permission.READ_CONTACTS
+                                    )
                                 },
-                                onDismiss = { pickingFor = null }
-                            )
-                        }
-
-                        // God quick sheet: long-press a quantum orb.
-                        sheetGod?.let { god ->
-                            GodQuickSheet(
-                                god = god,
-                                assignedLabel = godLabels[god.id],
-                                onLaunch = {
-                                    sheetGod = null
-                                    godPackages[god.id]?.let { launchApp(it) }
+                                onLaunchApp = ::launchApp,
+                                onSuggestionLaunch = { pkg ->
+                                    // Rotating god pulse: suggestions keep the
+                                    // constellation breathing.
+                                    ActivityBus.pulse(
+                                        PANTHEON[suggestionPulseIdx % PANTHEON.size].id
+                                    )
+                                    suggestionPulseIdx++
+                                    launchApp(pkg)
                                 },
-                                onAssign = {
-                                    sheetGod = null
-                                    pickingFor = god
+                                onGodClick = { god ->
+                                    ActivityBus.pulse(god.id)
+                                    val pkg = godPackages[god.id]
+                                    if (pkg != null) launchApp(pkg) else pickingFor = god
                                 },
-                                onAskPhoenix = {
-                                    sheetGod = null
+                                onGodLongPress = { god -> pickingFor = god },
+                                onOrbLongPress = { god -> sheetGod = god },
+                                onOpenDrawer = { screen = Screen.Drawer },
+                                onOpenSettings = { screen = Screen.Settings },
+                                onOpenPhoenix = { screen = Screen.Phoenix },
+                                onOpenSystem = { screen = Screen.System },
+                                onPhoenixPrompt = { text ->
                                     ActivityBus.pulse("phoenix")
-                                    pendingPhoenixPrompt =
-                                        "Tell me about ${god.name}, god of ${god.domain}, " +
-                                            "and how I should use them in my launcher."
+                                    pendingPhoenixPrompt = text
                                     screen = Screen.Phoenix
                                 },
-                                onDismiss = { sheetGod = null }
+                                onSetWallpaper = { applyQuantumWallpaper() },
+                                animationsEnabled = animationsEnabled,
+                                splashDone = splashDone,
+                                config = config,
+                                focusSearchSignal = focusSearchTick,
+                                onSwipeUp = { performGesture(config.gestureSwipeUp) },
+                                onSwipeDown = { performGesture(config.gestureSwipeDown) },
+                                onDoubleTap = { performGesture(config.gestureDoubleTap) },
+                                onPinch = { performGesture(config.gesturePinch) },
+                                onTwoFingerTap = { performGesture(config.gestureTwoFingerTap) }
                             )
-                        }
 
-                        // Showroom pill: floating stop control while the
-                        // showroom loop cycles presets.
-                        if (config.showroomEnabled) {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.TopCenter
+                            if (screen == Screen.Home &&
+                                config.dragonPosition != DragonPosition.HIDDEN
                             ) {
-                                Button(
-                                    onClick = {
-                                        lifecycleScope.launch {
-                                            modStore.setShowroomEnabled(false)
+                                val dragonAlign = when (config.dragonPosition) {
+                                    DragonPosition.BOTTOM_RIGHT -> Alignment.BottomEnd
+                                    DragonPosition.BOTTOM_LEFT -> Alignment.BottomStart
+                                    DragonPosition.TOP_RIGHT -> Alignment.TopEnd
+                                    DragonPosition.TOP_LEFT -> Alignment.TopStart
+                                    DragonPosition.HIDDEN -> Alignment.BottomEnd
+                                }
+                                DragonMascot(
+                                    animationsEnabled = animationsEnabled,
+                                    skin = config.dragonSkin,
+                                    behavior = config.dragonBehavior,
+                                    started = splashDone,
+                                    modifier = Modifier
+                                        .align(dragonAlign)
+                                        .padding(12.dp)
+                                        .size((104f * config.dragonSize).dp)
+                                )
+                            }
+
+                            // Phoenix — Brandon's on-screen companion. Tap to chat,
+                            // long-press for a stored-snapshot status bubble.
+                            // Swappable art: res/drawable/phoenix_companion.webp.
+                            if (screen == Screen.Home && companionVisible) {
+                                PhoenixCompanion(
+                                    snapshot = systemSnapshot,
+                                    animationsEnabled = animationsEnabled,
+                                    onOpenChat = { screen = Screen.Phoenix },
+                                    modifier = Modifier
+                                        .align(Alignment.CenterEnd)
+                                        .padding(end = 10.dp)
+                                        .size(112.dp)
+                                )
+                            }
+
+                            AnimatedVisibility(
+                                visible = screen == Screen.Drawer,
+                                enter = appEnter(),
+                                exit = appExit()
+                            ) {
+                                AppDrawer(
+                                    apps = apps,
+                                    onLaunch = ::launchApp,
+                                    onClose = { screen = Screen.Home },
+                                    badgeCounts = badgeCounts,
+                                    gridCols = config.gridCols,
+                                    iconSize = config.iconSize,
+                                    labelsVisible = config.labelsVisible,
+                                    labelSize = config.labelSize,
+                                    onSearch = { ActivityBus.pulse("odysseus") },
+                                    animationsEnabled = animationsEnabled
+                                )
+                            }
+
+                            AnimatedVisibility(
+                                visible = screen == Screen.Settings,
+                                enter = appEnter(),
+                                exit = appExit()
+                            ) {
+                                SettingsScreen(
+                                    animationsEnabled = animationsEnabled,
+                                    onToggleAnimations = { enabled ->
+                                        lifecycleScope.launch { store.setAnimationsEnabled(enabled) }
+                                    },
+                    companionVisible = companionVisible,
+                                    onToggleCompanion = { visible ->
+                                        lifecycleScope.launch { store.setCompanionVisible(visible) }
+                                    },
+                                    presenceOn = presenceOn,
+                                    onTogglePresence = { on ->
+                                        if (on) {
+                                            try {
+                                                PhoenixService.start(this@MainActivity)
+                                                presenceOn = true
+                                            } catch (e: Exception) {
+                                                Toast.makeText(
+                                                    this@MainActivity,
+                                                    "Couldn't start Phoenix: ${e.message}",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            }
+                                        } else {
+                                            PhoenixService.stop(this@MainActivity)
+                                            presenceOn = false
                                         }
                                     },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFFE25822)
-                                    ),
-                                    modifier = Modifier.padding(top = 52.dp)
+                                    godLabels = godLabels,
+                                    onPickGodApp = { god -> pickingFor = god },
+                                    onClearGodApp = { god ->
+                                        lifecycleScope.launch { store.clearGodApp(god) }
+                                    },
+                                    onOpenThemeEngine = { screen = Screen.ThemeEngine },
+                                    onOpenForge = { screen = Screen.Forge },
+                                    forgeGatewayUrl = forgeGatewayUrl,
+                                    forgeApiKey = forgeApiKey,
+                                    onSaveGateway = { url, key ->
+                                        lifecycleScope.launch {
+                                            store.setForgeGatewayUrl(url)
+                                            store.setForgeApiKey(key)
+                                        }
+                                    },
+                                    onBack = { screen = Screen.Home }
+                                )
+                            }
+
+                            AnimatedVisibility(
+                                visible = screen == Screen.ThemeEngine,
+                                enter = appEnter(),
+                                exit = appExit()
+                            ) {
+                                ThemeEngineScreen(
+                                    config = config,
+                                    onConfigChange = { new ->
+                                        lifecycleScope.launch { modStore.update { _ -> new } }
+                                    },
+                                    onProfileSelect = { profile ->
+                                        lifecycleScope.launch { modStore.setActiveProfile(profile) }
+                                    },
+                                    onPresetApply = { preset ->
+                                        lifecycleScope.launch { modStore.applyPreset(preset) }
+                                    },
+                                    onExport = { exportTheme(config) },
+                                    onImport = { importLauncher.launch("application/json") },
+                                    onBack = { screen = Screen.Home }
+                                )
+                            }
+
+                            AnimatedVisibility(
+                                visible = screen == Screen.Phoenix,
+                                enter = appEnter(),
+                                exit = appExit()
+                            ) {
+                                PhoenixScreen(
+                                    apiKey = phoenixApiKey,
+                                    messages = phoenixMessages,
+                                    busy = phoenixBusy,
+                                    onSaveApiKey = { key ->
+                                        lifecycleScope.launch { store.setPhoenixApiKey(key) }
+                                    },
+                                    onSend = ::sendToPhoenix,
+                                    onBack = { screen = Screen.Home },
+                                    proposals = proposals,
+                                    onProposalPrimary = { proposal ->
+                                        // "tap" and "genesis" kinds need the machine:
+                                        // copy for Zane. Everything else: mark done.
+                                        if (proposal.kind == "tap" || proposal.kind == "genesis") {
+                                            copyProposalForZane(proposal)
+                                        } else {
+                                            resolveProposal(proposal)
+                                        }
+                                    },
+                                    onProposalDismiss = ::dismissProposal
+                                )
+                            }
+
+                            AnimatedVisibility(
+                                visible = screen == Screen.Forge,
+                                enter = appEnter(),
+                                exit = appExit()
+                            ) {
+                                ForgeScreen(
+                                    gatewayUrl = forgeGatewayUrl,
+                                    apiKey = forgeApiKey,
+                                    animationsEnabled = animationsEnabled,
+                                    onSaveGateway = { url, key ->
+                                        lifecycleScope.launch {
+                                            store.setForgeGatewayUrl(url)
+                                            store.setForgeApiKey(key)
+                                        }
+                                    },
+                                    onBack = { screen = Screen.Home },
+                                    prefill = forgeDraft,
+                                    prefillTick = forgeDraftTick
+                                )
+                            }
+
+                            // GENESIS hub: nodes (live probes) + powers (everything it
+                            // can do / change) + system (stored snapshot, labeled).
+                            AnimatedVisibility(
+                                visible = screen == Screen.System,
+                                enter = appEnter(),
+                                exit = appExit()
+                            ) {
+                                GenesisScreen(
+                                    snapshot = systemSnapshot,
+                                    reach = nodeReach,
+                                    probing = probingNodes,
+                                    onProbeNodes = { probeNodes() },
+                                    onPower = ::firePower,
+                                    onBack = { screen = Screen.Home },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+
+                            pickingFor?.let { god ->
+                                AppPickerDialog(
+                                    title = "Assign app to ${god.name}",
+                                    apps = apps,
+                                    onPick = { app ->
+                                        lifecycleScope.launch {
+                                            store.setGodApp(god, app.packageName, app.label)
+                                        }
+                                        pickingFor = null
+                                        Toast.makeText(
+                                            this@MainActivity,
+                                            "${god.name} → ${app.label}",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    },
+                                    onDismiss = { pickingFor = null }
+                                )
+                            }
+
+                            // God quick sheet: long-press a quantum orb.
+                            sheetGod?.let { god ->
+                                GodQuickSheet(
+                                    god = god,
+                                    assignedLabel = godLabels[god.id],
+                                    onLaunch = {
+                                        sheetGod = null
+                                        godPackages[god.id]?.let { launchApp(it) }
+                                    },
+                                    onAssign = {
+                                        sheetGod = null
+                                        pickingFor = god
+                                    },
+                                    onAskPhoenix = {
+                                        sheetGod = null
+                                        ActivityBus.pulse("phoenix")
+                                        pendingPhoenixPrompt =
+                                            "Tell me about ${god.name}, god of ${god.domain}, " +
+                                                "and how I should use them in my launcher."
+                                        screen = Screen.Phoenix
+                                    },
+                                    onDismiss = { sheetGod = null }
+                                )
+                            }
+
+                            // Showroom pill: floating stop control while the
+                            // showroom loop cycles presets.
+                            if (config.showroomEnabled) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.TopCenter
                                 ) {
-                                    Text(
-                                        "SHOWROOM — tap to stop",
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Button(
+                                        onClick = {
+                                            lifecycleScope.launch {
+                                                modStore.setShowroomEnabled(false)
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = Color(0xFFE25822)
+                                        ),
+                                        modifier = Modifier.padding(top = 52.dp)
+                                    ) {
+                                        Text(
+                                            "SHOWROOM — tap to stop",
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
                             }
-                        }
 
+                        } // if (splashDone)
                         // Ignition splash: full-screen overlay on cold start.
                         if (!splashDone) {
                             SplashIgnition(onFinished = { splashDone = true })
