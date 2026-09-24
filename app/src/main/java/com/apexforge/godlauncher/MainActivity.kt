@@ -273,6 +273,10 @@ class MainActivity : ComponentActivity() {
                 // penguin. Probed on demand (never faked, never cached as live).
                 var nodeReach by remember { mutableStateOf<Map<String, NodeReach>>(emptyMap()) }
                 var probingNodes by remember { mutableStateOf(false) }
+
+                var screen by remember { mutableStateOf<Screen>(Screen.Home) }
+                var pickingFor by remember { mutableStateOf<God?>(null) }
+
                 fun probeNodes() {
                     if (probingNodes) return
                     probingNodes = true
@@ -312,9 +316,6 @@ class MainActivity : ComponentActivity() {
                         ).show()
                     }
                 }
-
-                var screen by remember { mutableStateOf<Screen>(Screen.Home) }
-                var pickingFor by remember { mutableStateOf<God?>(null) }
                 var sheetGod by remember { mutableStateOf<God?>(null) }
                 var focusSearchTick by remember { mutableIntStateOf(0) }
                 var suggestionPulseIdx by remember { mutableIntStateOf(0) }

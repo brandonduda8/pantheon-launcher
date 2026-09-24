@@ -220,34 +220,34 @@ private fun PhoneNodeCard(vitals: PhoneVitals?) {
                     fontSize = 12.sp,
                     modifier = Modifier.padding(top = 8.dp)
                 )
-                return
+            } else {
+                Spacer(modifier = Modifier.height(10.dp))
+                VitalRow(
+                    label = "BATTERY",
+                    value = "${vitals.batteryPct}%${if (vitals.charging) " · charging" else ""}",
+                    frac = vitals.batteryPct / 100f
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                VitalRow(
+                    label = "RAM",
+                    value = "${vitals.ramFreeMb} / ${vitals.ramTotalMb} MB free",
+                    frac = if (vitals.ramTotalMb > 0)
+                        vitals.ramFreeMb.toFloat() / vitals.ramTotalMb else 0f
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                VitalRow(
+                    label = "STORAGE",
+                    value = "%.1f / %.1f GB free".format(vitals.storageFreeGb, vitals.storageTotalGb),
+                    frac = if (vitals.storageTotalGb > 0)
+                        (vitals.storageFreeGb / vitals.storageTotalGb).toFloat() else 0f
+                )
+                Text(
+                    text = "uptime ${"%.1f".format(vitals.uptimeHrs)}h · read on-device just now",
+                    color = MutedStar,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
             }
-            Spacer(modifier = Modifier.height(10.dp))
-            VitalRow(
-                label = "BATTERY",
-                value = "${vitals.batteryPct}%${if (vitals.charging) " · charging" else ""}",
-                frac = vitals.batteryPct / 100f
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            VitalRow(
-                label = "RAM",
-                value = "${vitals.ramFreeMb} / ${vitals.ramTotalMb} MB free",
-                frac = if (vitals.ramTotalMb > 0)
-                    vitals.ramFreeMb.toFloat() / vitals.ramTotalMb else 0f
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            VitalRow(
-                label = "STORAGE",
-                value = "%.1f / %.1f GB free".format(vitals.storageFreeGb, vitals.storageTotalGb),
-                frac = if (vitals.storageTotalGb > 0)
-                    (vitals.storageFreeGb / vitals.storageTotalGb).toFloat() else 0f
-            )
-            Text(
-                text = "uptime ${"%.1f".format(vitals.uptimeHrs)}h · read on-device just now",
-                color = MutedStar,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(top = 8.dp)
-            )
         }
     }
 }
