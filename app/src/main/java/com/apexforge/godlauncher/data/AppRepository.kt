@@ -19,6 +19,18 @@ import kotlinx.coroutines.withContext
  */
 class AppRepository(private val context: Context) {
 
+    companion object {
+        /**
+         * Drawer / app-picker search. A blank query shows every app;
+         * otherwise a case-insensitive substring match on the label,
+         * keeping the input order (loadApps already sorts by label).
+         * Pure function so it is covered by JVM unit tests.
+         */
+        fun filter(apps: List<AppInfo>, query: String): List<AppInfo> =
+            if (query.isBlank()) apps
+            else apps.filter { it.label.contains(query, ignoreCase = true) }
+    }
+
     suspend fun loadApps(): List<AppInfo> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)

@@ -76,6 +76,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.apexforge.godlauncher.data.ContactResult
 import com.apexforge.godlauncher.data.ContactSearch
+import com.apexforge.godlauncher.data.AppRepository
 import com.apexforge.godlauncher.data.MathEval
 import com.apexforge.godlauncher.model.AppInfo
 import com.apexforge.godlauncher.model.DockPosition
@@ -151,7 +152,7 @@ fun HomeScreen(
     // --- Universal search sources ---
     val appResults = remember(apps, trimmed) {
         if (trimmed.isEmpty()) emptyList()
-        else apps.filter { it.label.contains(trimmed, ignoreCase = true) }.take(8)
+        else AppRepository.filter(apps, trimmed).take(8)
     }
 
     var contacts by remember { mutableStateOf<List<ContactResult>>(emptyList()) }
