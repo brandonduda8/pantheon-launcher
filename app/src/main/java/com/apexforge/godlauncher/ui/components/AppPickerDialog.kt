@@ -1,5 +1,6 @@
 package com.apexforge.godlauncher.ui.components
 
+import com.apexforge.godlauncher.data.AppRepository
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -37,8 +38,7 @@ fun AppPickerDialog(
 ) {
     var query by remember { mutableStateOf("") }
     val filtered = remember(apps, query) {
-        if (query.isBlank()) apps
-        else apps.filter { it.label.contains(query, ignoreCase = true) }
+        AppRepository.filter(apps, query)
     }
     Dialog(onDismissRequest = onDismiss) {
         Card(
