@@ -1,5 +1,8 @@
 # Pantheon Launcher
 
+[![Build release APK](https://github.com/brandonduda8/pantheon-launcher/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/brandonduda8/pantheon-launcher/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A custom Android home screen (`com.apexforge.godlauncher`) built with Kotlin, Jetpack Compose and Material 3. It registers as a real launcher (`CATEGORY_HOME`). minSdk 29, targetSdk 34, currently **v7.0.0**.
 
 > **CI status:** the signed release build passes. The API-34 **emulator smoke gate is currently failing**: it has been red on every run since it was added (2026-09-24), and the latest v7 commits target cold-start jank and ANRs. Treat v7 as work in progress until the gate is green.
@@ -23,10 +26,19 @@ A custom Android home screen (`com.apexforge.godlauncher`) built with Kotlin, Je
 
 No Gradle wrapper is committed; CI installs a pinned Gradle. For local builds and sideloading, see **[BUILD.md](BUILD.md)** (written for v1; the build steps still apply).
 
+## Tests
+
+There are no unit or instrumented test sources yet. The only automated check is
+the emulator smoke test in CI described above, which is currently failing.
+
 ## Repo map
 
 - `app/`: the launcher source
 - `BUILD.md`: build and install guide
 - `AGENT_BRIDGE.md`: the agent broadcast protocol
-- `v2-mockups/`, `v3-mockups/`: design notes and mockups
+- `v2-mockups/`, `v3-mockups/`: design notes and concept mockups (design targets, not screenshots of the current build)
 - `push_to_github.py`, `watch_build.py`: helper scripts for pushing and watching CI builds
+
+## License
+
+[MIT](LICENSE)
