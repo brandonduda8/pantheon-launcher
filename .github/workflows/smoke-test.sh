@@ -80,11 +80,11 @@ fi
 
 # Confirm MainActivity actually reached the resumed state (not just "process
 # alive but stuck on a black screen").
-if adb shell dumpsys activity activities 2>/dev/null | tr -d '\r' | grep -q "mResumedActivity.*$PKG"; then
+if adb shell dumpsys activity activities 2>/dev/null | tr -d '\r' | grep -qE "(mResumedActivity|topResumedActivity|ResumedActivity).*$PKG"; then
     echo "MainActivity is the resumed activity"
 else
     echo "SMOKE_FAIL: MainActivity never reached resumed state"
-    adb shell dumpsys activity activities 2>/dev/null | tr -d '\r' | grep -E "mResumedActivity|mFocusedApp" | head -5 || true
+    adb shell dumpsys activity activities 2>/dev/null | tr -d '\r' | grep -E "ResumedActivity|mFocusedApp" | head -5 || true
     FAIL=1
     # DIAGNOSTIC (v7): extended resume polling — does it EVER resume?
     # If the emulator is just slow to warm up (SwiftShader), the activity
@@ -92,7 +92,7 @@ else
     echo "== diagnostic: polling for resumed state (up to +120s)..."
     for i in 1 2 3 4 5; do
         sleep 15
-        if adb shell dumpsys activity activities 2>/dev/null | tr -d '\r' | grep -q "mResumedActivity.*$PKG"; then
+        if adb shell dumpsys activity activities 2>/dev/null | tr -d '\r' | grep -qE "(mResumedActivity|topResumedActivity|ResumedActivity).*$PKG"; then
             echo "DIAGNOSTIC: MainActivity resumed at +$((45 + i * 15))s (slow warmup, not stuck)"
             break
         fi
