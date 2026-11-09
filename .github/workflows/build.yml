@@ -79,6 +79,19 @@ jobs:
           name: pantheon-launcher-release
           path: apk
 
+      # Root cause of the red gate since Sep 24: without this, the runner user
+      # cannot open /dev/kvm, so android-emulator-runner falls back to
+      # `-accel off` (pure software CPU emulation). Boot alone took ~7 min and
+      # the whole guest was starved (system_server, networkstack, media
+      # provider all ANR'd), so the launcher could never reach resumed.
+      # This is the KVM setup documented by reactivecircus/android-emulator-runner.
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+
       - name: Emulator smoke test (API 34)
         uses: reactivecircus/android-emulator-runner@v2
         with:
