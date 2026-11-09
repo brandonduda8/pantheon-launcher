@@ -1,5 +1,6 @@
 package com.apexforge.godlauncher.ui.drawer
 
+import com.apexforge.godlauncher.data.AppRepository
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -55,8 +56,7 @@ fun AppDrawer(
 
     var query by remember { mutableStateOf("") }
     val filtered = remember(apps, query) {
-        if (query.isBlank()) apps
-        else apps.filter { it.label.contains(query, ignoreCase = true) }
+        AppRepository.filter(apps, query)
     }
 
     // Odysseus pulse: the journey begins the moment a drawer search starts.
