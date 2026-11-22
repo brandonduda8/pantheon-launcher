@@ -85,6 +85,7 @@ import com.apexforge.godlauncher.ui.background.LoopBackground
 import com.apexforge.godlauncher.ui.components.AppPickerDialog
 import com.apexforge.godlauncher.ui.drawer.AppDrawer
 import com.apexforge.godlauncher.ui.effects.DragonMascot
+import com.apexforge.godlauncher.ui.ember.EmberScreen
 import com.apexforge.godlauncher.ui.effects.PhoenixFX
 import com.apexforge.godlauncher.ui.effects.SplashIgnition
 import com.apexforge.godlauncher.ui.home.HomeScreen
@@ -109,6 +110,7 @@ private sealed interface Screen {
     data object Drawer : Screen
     data object Settings : Screen
     data object Phoenix : Screen
+    data object Ember : Screen
     data object ThemeEngine : Screen
     data object Forge : Screen
     data object System : Screen
@@ -728,6 +730,7 @@ class MainActivity : ComponentActivity() {
                                     animationsEnabled = animationsEnabled,
                                     skin = config.dragonSkin,
                                     behavior = config.dragonBehavior,
+                                    onInteract = { screen = Screen.Ember },
                                     started = splashDone,
                                     modifier = Modifier
                                         .align(dragonAlign)
@@ -839,6 +842,17 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onExport = { exportTheme(config) },
                                     onImport = { importLauncher.launch("application/json") },
+                                    onBack = { screen = Screen.Home }
+                                )
+                            }
+
+                            AnimatedVisibility(
+                                visible = screen == Screen.Ember,
+                                enter = appEnter(),
+                                exit = appExit()
+                            ) {
+                                EmberScreen(
+                                    apiKey = phoenixApiKey,
                                     onBack = { screen = Screen.Home }
                                 )
                             }
