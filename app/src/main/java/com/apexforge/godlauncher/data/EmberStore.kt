@@ -1,20 +1,23 @@
 package com.apexforge.godlauncher.data
 
 import android.content.Context
+import android.util.AtomicFile
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import kotlin.math.min
 
 /**
  * Ember's consent-first, on-device soul. This store does not use the network.
- * All learned facts are written only when the owner taps "Teach Ember".
- * No credentials, device identifiers, or Genesis secrets are exported.
+ * Files in noBackupFilesDir are app-private and excluded from Android auto-backup.
+ * We do not export credentials, identifying fields or other private memories.
  */
 data class EmberState(
     val xp: Int = 0,
     val bond: Int = 0,
     val energy: Int = 75,
-    val memories: List<String> = emptyList()
+    val memories: List<String> = emptyList(),
+    val lastInteractionAt: Long = 0L
 ) {
     val level: Int get() = 1 + xp / 100
     val stage: String get() = when {
@@ -34,31 +37,36 @@ data class EmberState(
 enum class EmberAction { PET, PRACTICE, REST }
 
 class EmberStore(context: Context) {
-    private val prefs = context.applicationContext.getSharedPreferences("ember_soul_v0", Context.MODE_PRIVATE)
+    private val atomic = AtomicFile(File(context.applicationContext.noBackupFilesDir, "ember_soul_v0.json"))
+
+    private fun readJson(): JSONObject = try {
+        val raw = atomic.openRead().use { it.readBytes().toString(Charsets.UTF_8) }
+        JSONObject(raw)
+    } catch (_: Exception) { JSONObject() }
 
     @Synchronized
     fun read(): EmberState {
+        val root = readJson()
         val memories = try {
-            val arr = JSONArray(prefs.getString("memories", "[]") ?: "[]")
+            val arr = root.optJSONArray("memories") ?: JSONArray()
             (0 until min(arr.length(), 40)).mapNotNull { index ->
                 arr.optString(index, "").take(240).takeIf { it.isNotBlank() }
             }
         } catch (_: Exception) { emptyList() }
         return EmberState(
-            xp = prefs.getInt("xp", 0).coerceIn(0, 1_000_000),
-            bond = prefs.getInt("bond", 0).coerceIn(0, 100),
-            energy = prefs.getInt("energy", 75).coerceIn(0, 100),
-            memories = memories
+            xp = root.optInt("xp", 0).coerceIn(0, 1_000_000),
+            bond = root.optInt("bond", 0).coerceIn(0, 100),
+            energy = root.optInt("energy", 75).coerceIn(0, 100),
+            memories = memories,
+            lastInteractionAt = root.optLong("lastInteractionAt", 0L).coerceAtLeast(0L)
         )
     }
 
     @Synchronized
     fun act(action: EmberAction): EmberState {
         val old = read()
-        // UI interactions have a short cooldown so accidental taps do not farm levels.
         val now = System.currentTimeMillis()
-        val key = "action_" + action.name
-        if (now - prefs.getLong(key, 0L) < 1500L) return old
+        if (now - old.lastInteractionAt < 1200L) return old
         val next = when (action) {
             EmberAction.PET -> old.copy(
                 xp = (old.xp + 2).coerceAtMost(1_000_000),
@@ -72,9 +80,8 @@ class EmberStore(context: Context) {
             )
             EmberAction.REST -> old.copy(energy = (old.energy + 25).coerceAtMost(100))
         }
-        write(next)
-        prefs.edit().putLong(key, now).apply()
-        return next
+        if (next != old) write(next.copy(lastInteractionAt = now))
+        return if (next == old) old else next.copy(lastInteractionAt = now)
     }
 
     @Synchronized
@@ -82,39 +89,47 @@ class EmberStore(context: Context) {
         val fact = text.trim().replace(Regex("\\s+"), " ").take(240)
         val old = read()
         if (fact.isBlank() || old.memories.any { it.equals(fact, ignoreCase = true) }) return old
-        val updated = old.copy(
+        val next = old.copy(
             xp = (old.xp + 15).coerceAtMost(1_000_000),
             bond = (old.bond + 2).coerceAtMost(100),
             memories = (old.memories + fact).takeLast(40)
         )
-        write(updated)
-        return updated
+        write(next)
+        return next
     }
 
     @Synchronized
     fun forget(text: String): EmberState {
-        val old = read()
-        val updated = old.copy(memories = old.memories.filterNot { it == text })
-        write(updated)
-        return updated
+        val next = read().let { it.copy(memories = it.memories.filterNot { fact -> fact == text }) }
+        write(next)
+        return next
     }
 
     @Synchronized
     fun erase(): EmberState {
-        prefs.edit().clear().apply()
+        atomic.delete()
         return EmberState()
     }
 
     private fun write(state: EmberState) {
-        prefs.edit()
-            .putInt("xp", state.xp)
-            .putInt("bond", state.bond)
-            .putInt("energy", state.energy)
-            .putString("memories", JSONArray(state.memories).toString())
-            .apply()
+        val json = JSONObject()
+            .put("xp", state.xp)
+            .put("bond", state.bond)
+            .put("energy", state.energy)
+            .put("lastInteractionAt", state.lastInteractionAt)
+            .put("memories", JSONArray(state.memories))
+            .toString()
+        val stream = atomic.startWrite()
+        try {
+            stream.write(json.toByteArray(Charsets.UTF_8))
+            atomic.finishWrite(stream)
+        } catch (e: Exception) {
+            atomic.failWrite(stream)
+            throw e
+        }
     }
 
-    /** An egg to gift, not a copy of the owner's personal memories. */
+    /** A cosmetic dragon egg, not a copy of the owner's private memories. */
     fun giftEggJson(): String = JSONObject()
         .put("schema", "genesis.dragon-egg.v0")
         .put("species", "ember-dragon")
