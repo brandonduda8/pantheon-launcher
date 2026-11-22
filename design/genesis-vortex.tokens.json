@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "Genesis Vortex",
+  "version": "1.0.0",
+  "status": "prototype",
+  "preset": "VORTEX // EMBER",
+  "tagline": "Living Intelligence. A World in Your Pocket.",
+  "palette": {
+    "voidBlack": "#06070B",
+    "abyssPurple": "#2B0A59",
+    "electricViolet": "#7A2BFF",
+    "plasmaMagenta": "#D14BFF",
+    "stormBlue": "#3EC8FF",
+    "emberGold": "#F2A63B",
+    "dragonEmber": "#FF6A2B",
+    "silverMist": "#C8D2E8",
+    "textPrimary": "#F5F3FF",
+    "textMuted": "#B5A9C9",
+    "surface": "#10101C",
+    "surfaceElevated": "#19132A",
+    "border": "#5D348F"
+  },
+  "typography": {
+    "display": ["Orbitron", "sans-serif"],
+    "ui": ["Space Grotesk", "sans-serif"],
+    "code": ["JetBrains Mono", "monospace"]
+  },
+  "radiiDp": { "panel": 20, "control": 12 },
+  "minTouchTargetDp": 48,
+  "motionModes": ["static", "balanced", "cinematic"],
+  "defaultMotionMode": "balanced",
+  "highContrastTextRequired": true,
+  "components": ["home", "dock", "appDrawer", "clock", "portal", "EmberWidget", "SolonEntry", "systemStatus", "missions"],
+  "privacy": {
+    "personalFactsInExport": false,
+    "credentialsInExport": false,
+    "optInBackgroundAccess": true
+  },
+  "limitations": ["Does not reskin Android system UI", "No root requirement", "No direct control of other apps"]
+}
