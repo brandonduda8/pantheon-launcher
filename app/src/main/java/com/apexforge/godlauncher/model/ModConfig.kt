@@ -29,6 +29,12 @@ enum class DragonBehavior { CALM, PLAYFUL, HYPER }
 enum class DragonPosition { BOTTOM_RIGHT, BOTTOM_LEFT, TOP_RIGHT, TOP_LEFT, HIDDEN }
 enum class CommandBarStyle { EMBER_GLOW, GLASS, MINIMAL }
 enum class Profile { DEFAULT, FOCUS, NIGHT, SHOWROOM }
+/** Top-level brand skin. PANTHEON is the shipping default; VORTEX_EMBER is opt-in. */
+enum class BrandSkin { PANTHEON, VORTEX_EMBER }
+
+/** Genesis Vortex motion contract (design/genesis-vortex.tokens.json motionModes). */
+enum class MotionMode { STATIC, BALANCED, CINEMATIC }
+
 enum class PantheonPreset { EMBER_REBIRTH, QUANTUM_MACHINE, VOID_MINIMAL }
 
 /** Brand defaults shared by presets. */
@@ -111,6 +117,8 @@ data class PantheonConfig(
     val activeProfile: Profile = Profile.DEFAULT,
     // -- showroom --
     val showroomEnabled: Boolean = false,
+    val brandSkin: BrandSkin = BrandSkin.PANTHEON,
+    val motionMode: MotionMode = MotionMode.BALANCED,
     val showroomSeconds: Int = 10
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
@@ -170,11 +178,13 @@ data class PantheonConfig(
         put("quantumViewEnabled", quantumViewEnabled)
         put("activeProfile", activeProfile.name)
         put("showroomEnabled", showroomEnabled)
+        put("brandSkin", brandSkin.name)
+        put("motionMode", motionMode.name)
         put("showroomSeconds", showroomSeconds)
     }
 
     companion object {
-        const val VERSION = 3
+        const val VERSION = 4
 
         fun fromJson(json: JSONObject): PantheonConfig {
             val d = PantheonConfig()
@@ -239,6 +249,8 @@ data class PantheonConfig(
                 quantumViewEnabled = b("quantumViewEnabled", d.quantumViewEnabled),
                 activeProfile = optEnum(json, "activeProfile", d.activeProfile),
                 showroomEnabled = b("showroomEnabled", d.showroomEnabled),
+                brandSkin = optEnum(json, "brandSkin", d.brandSkin),
+                motionMode = optEnum(json, "motionMode", d.motionMode),
                 showroomSeconds = i("showroomSeconds", d.showroomSeconds).coerceIn(3, 60)
             )
         }

@@ -6,6 +6,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import androidx.activity.compose.BackHandler
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
@@ -75,6 +76,11 @@ import com.apexforge.godlauncher.data.SnapshotStore
 import com.apexforge.godlauncher.data.SystemSnapshot
 import com.apexforge.godlauncher.service.PhoenixService
 import com.apexforge.godlauncher.model.AppInfo
+import com.apexforge.godlauncher.model.BrandSkin
+import com.apexforge.godlauncher.model.VortexPreset
+import com.apexforge.godlauncher.ui.vortex.VortexBackground
+import com.apexforge.godlauncher.ui.vortex.VortexPreviewBanner
+import com.apexforge.godlauncher.ui.vortex.VortexThemeCard
 import com.apexforge.godlauncher.model.AppTransition
 import com.apexforge.godlauncher.model.DragonPosition
 import com.apexforge.godlauncher.model.GestureAction
@@ -173,8 +179,14 @@ class MainActivity : ComponentActivity() {
                 val baseDensity = LocalDensity.current
 
                 // v3 mod engine: the whole launcher theme as one live config.
-                val config by modStore.config
+                val storedConfig by modStore.config
                     .collectAsStateWithLifecycle(initialValue = PantheonConfig())
+                // VORTEX // EMBER preview: in-memory only, never persisted until Apply.
+                var previewConfig by remember { mutableStateOf<PantheonConfig?>(null) }
+                val config = previewConfig ?: storedConfig
+                val vortex = config.brandSkin == BrandSkin.VORTEX_EMBER
+                val hasVortexUndo by modStore.hasVortexUndo
+                    .collectAsStateWithLifecycle(initialValue = false)
 
                 // Installed apps, re-queried every time we return to the foreground
                 // so newly installed apps show up without a restart.
@@ -635,6 +647,7 @@ class MainActivity : ComponentActivity() {
                         fontScale = baseDensity.fontScale * config.fontScale
                     )
                 ) {
+                  PantheonTheme(vortex = vortex) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         // v7 cold-start fast path: the ignition splash is fully
                         // opaque for its 2.6s life, so the entire home tree
@@ -645,17 +658,25 @@ class MainActivity : ComponentActivity() {
                         // Zero visual change: nothing behind the splash is
                         // ever visible while it is up.
                         if (splashDone) {
-                            LoopBackground(
-                                config = config,
-                                animationsEnabled = animationsEnabled,
-                                started = splashDone
-                            )
+                            if (vortex) {
+                                VortexBackground(
+                                    requested = config.motionMode,
+                                    animationsEnabled = animationsEnabled,
+                                    started = splashDone
+                                )
+                            } else {
+                                LoopBackground(
+                                    config = config,
+                                    animationsEnabled = animationsEnabled,
+                                    started = splashDone
+                                )
+                            }
 
                             // Living layer, home screen only. The phoenix burns
                             // behind the home UI (clock stays readable) at the
                             // clock area; the dragon overlays per its configured
                             // corner.
-                            if (screen == Screen.Home) {
+                            if (screen == Screen.Home && !vortex) {
                                 PhoenixFX(
                                     animationsEnabled = animationsEnabled,
                                     ignite = ignitePhoenix,
@@ -711,8 +732,28 @@ class MainActivity : ComponentActivity() {
                                 onSwipeDown = { performGesture(config.gestureSwipeDown) },
                                 onDoubleTap = { performGesture(config.gestureDoubleTap) },
                                 onPinch = { performGesture(config.gesturePinch) },
-                                onTwoFingerTap = { performGesture(config.gestureTwoFingerTap) }
+                                onTwoFingerTap = { performGesture(config.gestureTwoFingerTap) },
+                                // Keep the preview banner from covering the header/clock.
+                                modifier = if (previewConfig != null) Modifier.padding(top = 56.dp) else Modifier
                             )
+
+                            if (previewConfig != null && screen == Screen.Home) {
+                                BackHandler {
+                                    previewConfig = null
+                                    screen = Screen.ThemeEngine
+                                }
+                                VortexPreviewBanner(
+                                    onApply = {
+                                        lifecycleScope.launch { modStore.applyVortex() }
+                                        previewConfig = null
+                                    },
+                                    onCancel = {
+                                        previewConfig = null
+                                        screen = Screen.ThemeEngine
+                                    },
+                                    modifier = Modifier.align(Alignment.TopCenter)
+                                )
+                            }
 
                             if (screen == Screen.Home &&
                                 config.dragonPosition != DragonPosition.HIDDEN
@@ -739,7 +780,8 @@ class MainActivity : ComponentActivity() {
                             // Phoenix — Brandon's on-screen companion. Tap to chat,
                             // long-press for a stored-snapshot status bubble.
                             // Swappable art: res/drawable/phoenix_companion.webp.
-                            if (screen == Screen.Home && companionVisible) {
+                            // Vortex replaces the floating companion with the Ember home widget.
+                            if (screen == Screen.Home && companionVisible && !vortex) {
                                 PhoenixCompanion(
                                     snapshot = systemSnapshot,
                                     animationsEnabled = animationsEnabled,
@@ -839,7 +881,27 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onExport = { exportTheme(config) },
                                     onImport = { importLauncher.launch("application/json") },
-                                    onBack = { screen = Screen.Home }
+                                    onBack = { screen = Screen.Home },
+                                    vortexCard = {
+                                        VortexThemeCard(
+                                            active = vortex,
+                                            hasUndo = hasVortexUndo,
+                                            motionMode = config.motionMode,
+                                            onPreview = {
+                                                previewConfig = VortexPreset.config(storedConfig)
+                                                screen = Screen.Home
+                                            },
+                                            onApply = { lifecycleScope.launch { modStore.applyVortex() } },
+                                            onUndo = { lifecycleScope.launch { modStore.undoVortex() } },
+                                            onRestoreDefault = { lifecycleScope.launch { modStore.restoreDefault() } },
+                                            onMotionMode = { m -> lifecycleScope.launch { modStore.setMotionMode(m) } },
+                                            onChooseHomeApp = {
+                                                runCatching {
+                                                    startActivity(Intent(android.provider.Settings.ACTION_HOME_SETTINGS))
+                                                }
+                                            }
+                                        )
+                                    }
                                 )
                             }
 
@@ -987,6 +1049,7 @@ class MainActivity : ComponentActivity() {
                             SplashIgnition(onFinished = { splashDone = true })
                         }
                     }
+                  }
                 }
             }
         }
