@@ -4,6 +4,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import com.apexforge.godlauncher.ui.vortex.VortexColorScheme
 
 private val PantheonColorScheme = darkColorScheme(
     // Brand soul: charcoal ashes into ember orange and phoenix gold.
@@ -23,9 +24,9 @@ private val PantheonColorScheme = darkColorScheme(
 )
 
 @Composable
-fun PantheonTheme(content: @Composable () -> Unit) {
+fun PantheonTheme(vortex: Boolean = false, content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = PantheonColorScheme,
+        colorScheme = if (vortex) VortexColorScheme else PantheonColorScheme,
         typography = PantheonTypography,
         content = content
     )

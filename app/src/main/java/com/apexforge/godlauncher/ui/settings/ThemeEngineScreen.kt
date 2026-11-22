@@ -108,7 +108,8 @@ fun ThemeEngineScreen(
     onExport: () -> Unit,
     onImport: () -> Unit,
     onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    vortexCard: @Composable () -> Unit = {}
 ) {
     BackHandler(onBack = onBack)
     var openSections by remember { mutableStateOf(setOf("Presets & Profiles")) }
@@ -138,6 +139,7 @@ fun ThemeEngineScreen(
         }
 
         LazyColumn(modifier = Modifier.padding(horizontal = 16.dp)) {
+            item { vortexCard() }
             item {
                 SectionCard(
                     title = "Presets & Profiles",

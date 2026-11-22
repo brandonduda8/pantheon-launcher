@@ -5,7 +5,7 @@
 
 A custom Android home screen (`com.apexforge.godlauncher`) built with Kotlin, Jetpack Compose and Material 3. It registers as a real launcher (`CATEGORY_HOME`). minSdk 29, targetSdk 34, currently **v7.0.0**.
 
-> **CI status:** the signed release build passes. The API-34 **emulator smoke gate is currently failing**: it has been red on every run since it was added (2026-09-24), and the latest v7 commits target cold-start jank and ANRs. Treat v7 as work in progress until the gate is green.
+> **CI status:** the signed release build and the API-34 emulator smoke gate both pass on `main` (green since the KVM fix in PR #4, e.g. run [42556437999](https://github.com/brandonduda8/pantheon-launcher/actions/runs/42556437999) on `34ac332`). Pull requests run [`vortex-pr.yml`](.github/workflows/vortex-pr.yml): unit tests, debug APK, emulator smoke — no secrets.
 
 ## What it does
 
@@ -29,7 +29,7 @@ No Gradle wrapper is committed; CI installs a pinned Gradle. For local builds an
 ## Tests
 
 There are no unit or instrumented test sources yet. The only automated check is
-the emulator smoke test in CI described above, which is currently failing.
+the emulator smoke test in CI described above, plus JVM unit tests for the VORTEX // EMBER preset (`app/src/test`).
 
 ## Repo map
 

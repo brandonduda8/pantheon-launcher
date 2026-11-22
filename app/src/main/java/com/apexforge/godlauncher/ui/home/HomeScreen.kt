@@ -78,6 +78,10 @@ import com.apexforge.godlauncher.data.ContactResult
 import com.apexforge.godlauncher.data.ContactSearch
 import com.apexforge.godlauncher.data.MathEval
 import com.apexforge.godlauncher.model.AppInfo
+import com.apexforge.godlauncher.model.BrandSkin
+import com.apexforge.godlauncher.ui.vortex.VortexHeader
+import com.apexforge.godlauncher.ui.vortex.VortexWidgetRow
+import com.apexforge.godlauncher.ui.vortex.vortexGods
 import com.apexforge.godlauncher.model.DockPosition
 import com.apexforge.godlauncher.model.God
 import com.apexforge.godlauncher.model.PANTHEON
@@ -200,11 +204,13 @@ fun HomeScreen(
     val showCard = trimmed.isNotEmpty() && (hasAnyResult || !contactsGranted)
 
     // Dock gods: configured order, minus hidden, capped at dock slots.
-    val dockGods = remember(config.dockOrder, config.dockHidden, config.dockSlots) {
+    val vortex = config.brandSkin == BrandSkin.VORTEX_EMBER
+    val dockGods = remember(config.dockOrder, config.dockHidden, config.dockSlots, vortex) {
         val ordered = config.dockOrder.mapNotNull { id -> PANTHEON.find { it.id == id } } +
             PANTHEON.filter { g -> g.id !in config.dockOrder }
         ordered.filter { it.id !in config.dockHidden }
             .take(config.dockSlots.coerceIn(4, 8))
+            .let { if (vortex) vortexGods(it) else it }
     }
 
     fun dial(number: String) {
@@ -370,7 +376,7 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            ClockWidget(started = splashDone)
+            if (vortex) VortexHeader(started = splashDone) else ClockWidget(started = splashDone)
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -379,6 +385,11 @@ fun HomeScreen(
             }
 
             Spacer(modifier = Modifier.weight(1f))
+
+            if (vortex) {
+                VortexWidgetRow(onOpenEmber = onOpenPhoenix, onOpenGenesis = onOpenSystem)
+                Spacer(modifier = Modifier.height(10.dp))
+            }
 
             SmartSuggestions(
                 suggestions = suggestions,

@@ -93,6 +93,10 @@ dependencies {
     // Persistent storage for god-dock assignments + settings (no extra DB needed).
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
+    // JVM unit tests (VORTEX // EMBER token, preset, migration, export contracts).
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
