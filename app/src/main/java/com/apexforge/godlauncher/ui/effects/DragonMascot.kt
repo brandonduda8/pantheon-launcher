@@ -92,6 +92,7 @@ fun DragonMascot(
     animationsEnabled: Boolean,
     skin: DragonSkin = DragonSkin.VOID,
     behavior: DragonBehavior = DragonBehavior.PLAYFUL,
+    onInteract: (() -> Unit)? = null,
     started: Boolean = true,
     modifier: Modifier = Modifier
 ) {
@@ -217,6 +218,7 @@ fun DragonMascot(
     val lastFrameNs = remember { longArrayOf(0L) }
 
     fun onTap() {
+        onInteract?.invoke()
         if (!animating) return
         // Happy hop.
         scope.launch {
