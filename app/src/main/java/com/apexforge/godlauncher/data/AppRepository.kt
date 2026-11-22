@@ -35,7 +35,11 @@ class AppRepository(private val context: Context) {
             } catch (_: Exception) {
                 null
             }
-        }.sortedBy { it.label.lowercase() }
+        }
+            // Apps with several launcher activities (e.g. Google) resolve more
+            // than once; launch() is by package, and drawer keys must be unique.
+            .distinctBy { it.packageName }
+            .sortedBy { it.label.lowercase() }
     }
 
     /** Returns false when the package has no launch intent or the start fails. */

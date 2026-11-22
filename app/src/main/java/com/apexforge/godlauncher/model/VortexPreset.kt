@@ -83,7 +83,7 @@ object VortexPreset {
         particleColor = VortexTokens.DRAGON_EMBER,
         vignette = 0.35f,
         dockStyle = DockStyle.GLASS,
-        dockSlots = 5,
+        dockSlots = 4,
         iconShape = IconShape.SQUIRCLE,
         iconGlow = 0.3f,
         neonTint = false,

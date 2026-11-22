@@ -4,10 +4,13 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.graphics.Color
 import com.apexforge.godlauncher.model.VortexTokens
 
-private fun hex(s: String) = Color(("FF" + s.removePrefix("#")).toLong(16))
-
 /** Compose colors derived from [VortexTokens] (single source of truth). */
 object VortexColors {
+    // Must live inside the object: a file-level helper would make VortexColors'
+    // init load this file's class, whose VortexColorScheme then reads these
+    // fields while they are still zero (transparent).
+    private fun hex(s: String) = Color(("FF" + s.removePrefix("#")).toLong(16))
+
     val VoidBlack = hex(VortexTokens.VOID_BLACK)
     val AbyssPurple = hex(VortexTokens.ABYSS_PURPLE)
     val ElectricViolet = hex(VortexTokens.ELECTRIC_VIOLET)

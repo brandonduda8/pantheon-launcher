@@ -732,7 +732,9 @@ class MainActivity : ComponentActivity() {
                                 onSwipeDown = { performGesture(config.gestureSwipeDown) },
                                 onDoubleTap = { performGesture(config.gestureDoubleTap) },
                                 onPinch = { performGesture(config.gesturePinch) },
-                                onTwoFingerTap = { performGesture(config.gestureTwoFingerTap) }
+                                onTwoFingerTap = { performGesture(config.gestureTwoFingerTap) },
+                                // Keep the preview banner from covering the header/clock.
+                                modifier = if (previewConfig != null) Modifier.padding(top = 56.dp) else Modifier
                             )
 
                             if (previewConfig != null && screen == Screen.Home) {
