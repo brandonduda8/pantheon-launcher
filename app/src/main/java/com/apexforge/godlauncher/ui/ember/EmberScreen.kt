@@ -215,8 +215,8 @@ fun EmberScreen(apiKey: String, onBack: () -> Unit) {
                 scope.launch {
                     val reply = try { brain.askGemini(apiKey, prompt, state) }
                     catch (_: Exception) {
-                        "The AI connection didn't work. Your memories stayed on this phone; " +
-                            "please check the provider and network."
+                        "The AI request failed. A provider may have received the message " +
+                            "before the failure; please check your connection."
                     }
                     busy = false
                     say(reply)
