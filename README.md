@@ -5,7 +5,7 @@
 
 A custom Android home screen (`com.apexforge.godlauncher`) built with Kotlin, Jetpack Compose and Material 3. It registers as a real launcher (`CATEGORY_HOME`). minSdk 29, targetSdk 34, currently **v7.0.0**.
 
-> **CI status:** the signed release build passes. The API-34 **emulator smoke gate is currently failing**: it has been red on every run since it was added (2026-09-24), and the latest v7 commits target cold-start jank and ANRs. Treat v7 as work in progress until the gate is green.
+> **CI status:** the signed release build and the API-34 emulator smoke test both pass on `main`. The smoke test has been green since the KVM fix in PR #4 (2026-11-09).
 
 ## What it does
 
@@ -29,7 +29,7 @@ No Gradle wrapper is committed; CI installs a pinned Gradle. For local builds an
 ## Tests
 
 There are no unit or instrumented test sources yet. The only automated check is
-the emulator smoke test in CI described above, which is currently failing.
+the emulator smoke test in CI described above, which passes on `main`.
 
 ## Repo map
 
